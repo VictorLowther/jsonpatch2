@@ -1,4 +1,4 @@
-package jsonpatch
+package jsonpatch2
 
 // jsonpatch is a library for creating and applying JSON Patches as defined in RFC 6902.
 //
@@ -15,11 +15,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/VictorLowther/jsonpatch/utils"
+	"github.com/VictorLowther/jsonpatch2/utils"
 )
 
 // operation represents a valid JSON Patch operation as defined by RFC 6902
-type operation struct {
+type Operation struct {
 	// Op can be one of:
 	//    * "add"
 	//    * "remove"
@@ -31,15 +31,15 @@ type operation struct {
 	Op string `json:"op"`
 	// Path is a JSON Pointer as defined in RFC 6901
 	// All Operations must have a Path
-	Path pointer `json:"path"`
+	Path Pointer `json:"path"`
 	// From is a JSON pointer indicating where a value should be
 	// copied/moved from.  From is only used by copy and move operations.
-	From pointer `json:"from"`
+	From Pointer `json:"from"`
 	// Value is the Value to be used for add, replace, and test operations.
 	Value interface{} `json:"value"`
 }
 
-func (o *operation) MarshalJSON() ([]byte, error) {
+func (o *Operation) MarshalJSON() ([]byte, error) {
 	res := map[string]interface{}{}
 	res["op"] = o.Op
 	res["path"] = o.Path
@@ -55,7 +55,7 @@ func (o *operation) MarshalJSON() ([]byte, error) {
 const ContentType = "application/json-patch+json"
 
 // Apply performs a single patch operation
-func (o *operation) Apply(to interface{}) (interface{}, error) {
+func (o *Operation) Apply(to interface{}) (interface{}, error) {
 	switch o.Op {
 	case "test":
 		return to, o.Path.Test(to, o.Value)
@@ -75,11 +75,11 @@ func (o *operation) Apply(to interface{}) (interface{}, error) {
 }
 
 // Patch is an array of individual JSON Patch operations.
-type patch []operation
+type Patch []Operation
 
 // NewPatch takes a byte array and tries to unmarshal it.
-func newPatch(buf []byte) (res patch, err error) {
-	res = make(patch, 0)
+func NewPatch(buf []byte) (res Patch, err error) {
+	res = make(Patch, 0)
 	if err = json.Unmarshal(buf, &res); err != nil {
 		return nil, err
 	}
@@ -120,11 +120,7 @@ func newPatch(buf []byte) (res patch, err error) {
 //
 // base must be the result of unmarshaling JSON to interface{}, and
 // will not be modified.
-func Apply(base interface{}, rawPatch []byte) (result interface{}, err error, loc int) {
-	p, err := newPatch(rawPatch)
-	if err != nil {
-		return nil, err, 0
-	}
+func (p Patch) Apply(base interface{}) (result interface{}, err error, loc int) {
 	result = utils.Clone(base)
 	for i, op := range p {
 		result, err = op.Apply(result)
@@ -137,13 +133,13 @@ func Apply(base interface{}, rawPatch []byte) (result interface{}, err error, lo
 
 // ApplyJSON does the same thing as Apply, except the inputs should be
 // JSON-containing byte arrays instead of unmarshalled JSON
-func ApplyJSON(base, rawPatch []byte) (result []byte, err error, loc int) {
+func (p Patch) ApplyJSON(base []byte) (result []byte, err error, loc int) {
 	var rawBase interface{}
 	err = json.Unmarshal(base, &rawBase)
 	if err != nil {
 		return nil, err, 0
 	}
-	rawRes, err, loc := Apply(rawBase, rawPatch)
+	rawRes, err, loc := p.Apply(rawBase)
 	if err != nil {
 		return nil, err, loc
 	}

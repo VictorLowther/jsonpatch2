@@ -1,4 +1,4 @@
-package jsonpatch
+package jsonpatch2
 
 import (
 	"encoding/json"
@@ -417,7 +417,11 @@ func TestPatches(t *testing.T) {
 			t.Errorf("`%v` is not a valid JSON final (%v)", test.final, err)
 			continue
 		}
-		res, err, idx := Apply(src, []byte(test.patch))
+		patch, err := NewPatch([]byte(test.patch))
+		if err != nil {
+			t.Errorf("%v: Failed to make a Patch: %#v", test.desc, err)
+		}
+		res, err, idx := patch.Apply(src)
 		if test.pass {
 			if err != nil {
 				t.Errorf("Failed to apply patch `%v`. Failed at operation %v (%v)", test.patch, idx, err)
@@ -438,34 +442,25 @@ func TestPatches(t *testing.T) {
 				t.Errorf("Expected patch `%v` to fail at operation %v, but it passed.", test.patch, idx)
 				continue
 			} else if idx != test.failidx {
-				t.Errorf("Expected patch `%v` to fail at operation ~v, but it failed at %v instead!", test.patch, test.failidx, idx)
+				t.Errorf("Expected patch `%v` to fail at operation %v, but it failed at %v instead!", test.patch, test.failidx, idx)
 				continue
 			}
 		}
 		if !test.shouldPatch {
 			continue
 		}
-		testPatch, err := Generate(src, final, false)
+		testPatch, err := Generate([]byte(test.src), []byte(test.final), false)
 		if err != nil {
 			t.Errorf("Failed to generate patch to translate `%v` to `%v` (`%v`", test.src, test.final, err)
 			continue
 		}
 
-		var rawRefPatch, rawGenPatch patch
-		if json.Unmarshal([]byte(test.patch), &rawRefPatch) != nil {
-			t.Errorf("Did not expect to fail to unmarshal reference patch `%v`", test.patch)
-			continue
+		if !reflect.DeepEqual(patch, testPatch) {
+			t.Errorf("Generated patch \n\t`%v` \nis not equal to reference patch \n\t`%v`", testPatch, test.patch)
 		}
-		if json.Unmarshal(testPatch, &rawGenPatch) != nil {
-			t.Errorf("Did not expect to fail to be able to unmarshal generated patch `%v`", testPatch)
-			continue
-		}
-		if !reflect.DeepEqual(rawRefPatch, rawGenPatch) {
-			t.Errorf("Generated patch \n\t`%v` \nis not equal to reference patch \n\t`%v`", string(testPatch), test.patch)
-		}
-		newRes, err, idx := Apply(src, testPatch)
+		newRes, err, idx := testPatch.Apply(src)
 		if err != nil {
-			t.Errorf("Failed to apply generated patch `%v`. Failed at operation %v (%v)", string(testPatch), idx, err)
+			t.Errorf("Failed to apply generated patch `%v`. Failed at operation %v (%v)", testPatch, idx, err)
 			continue
 		}
 		if !reflect.DeepEqual(newRes, final) {
@@ -474,7 +469,7 @@ func TestPatches(t *testing.T) {
 				t.Errorf("Failed to make JSON for patched result to display error! (%v)", err)
 				continue
 			}
-			t.Errorf("Applying generated patch `%v` to `%v` did not yield expected result `%v`!", string(testPatch), test.src, test.final)
+			t.Errorf("Applying generated patch `%v` to `%v` did not yield expected result `%v`!", testPatch, test.src, test.final)
 			t.Errorf("Got `%v` instead", string(actual))
 			continue
 		}
