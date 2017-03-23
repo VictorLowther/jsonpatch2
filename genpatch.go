@@ -12,11 +12,12 @@ import (
 // There is a lot of optimization that could be done here, but it can get complex real quick.
 func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
 	res := make(Patch, 0)
+	pstr := ptr.String()
 	if reflect.TypeOf(base) != reflect.TypeOf(target) {
 		if paranoid {
-			res = append(res, Operation{"test", ptr, nil, utils.Clone(base)})
+			res = append(res, Operation{"test", pstr, "", utils.Clone(base), ptr, nil})
 		}
-		res = append(res, Operation{"replace", ptr, nil, utils.Clone(target)})
+		res = append(res, Operation{"replace", pstr, "", utils.Clone(target), ptr, nil})
 		return res
 	}
 	switch baseVal := base.(type) {
@@ -26,13 +27,14 @@ func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
 		// Handle removed and changed first.
 		for k, oldVal := range baseVal {
 			newPtr := ptr.Append(k)
+			newPstr := newPtr.String()
 			newVal, ok := targetVal[k]
 			if !ok {
 				// Generate a remove op
 				if paranoid {
-					res = append(res, Operation{"test", newPtr, nil, utils.Clone(oldVal)})
+					res = append(res, Operation{"test", newPstr, "", utils.Clone(oldVal), newPtr, nil})
 				}
-				res = append(res, Operation{"remove", newPtr, nil, nil})
+				res = append(res, Operation{"remove", newPstr, "", nil, newPtr, nil})
 			} else {
 				subPatch := basicGen(oldVal, newVal, paranoid, newPtr)
 				res = append(res, subPatch...)
@@ -44,7 +46,9 @@ func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
 			if _, ok := handled[k]; ok {
 				continue
 			}
-			res = append(res, Operation{"add", ptr.Append(k), nil, utils.Clone(newVal)})
+			newPtr := ptr.Append(k)
+			newPstr := newPtr.String()
+			res = append(res, Operation{"add", newPstr, "", utils.Clone(newVal), newPtr, nil})
 		}
 	// case []interface{}:
 	// Eventually, add code to handle slices more
@@ -52,9 +56,9 @@ func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
 	default:
 		if !reflect.DeepEqual(base, target) {
 			if paranoid {
-				res = append(res, Operation{"test", ptr, nil, utils.Clone(base)})
+				res = append(res, Operation{"test", pstr, "", utils.Clone(base), ptr, nil})
 			}
-			res = append(res, Operation{"replace", ptr, nil, utils.Clone(target)})
+			res = append(res, Operation{"replace", pstr, "", utils.Clone(target), ptr, nil})
 		}
 	}
 	return res

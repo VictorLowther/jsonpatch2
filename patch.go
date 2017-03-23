@@ -31,25 +31,41 @@ type Operation struct {
 	Op string `json:"op"`
 	// Path is a JSON Pointer as defined in RFC 6901
 	// All Operations must have a Path
-	Path pointer `json:"path"`
+	Path string `json:"path"`
 	// From is a JSON pointer indicating where a value should be
 	// copied/moved from.  From is only used by copy and move operations.
-	From pointer `json:"from"`
+	From string `json:"from"`
 	// Value is the Value to be used for add, replace, and test operations.
-	Value interface{} `json:"value"`
+	Value      interface{} `json:"value"`
+	path, from pointer
 }
 
-func (o *Operation) MarshalJSON() ([]byte, error) {
-	res := map[string]interface{}{}
-	res["op"] = o.Op
-	res["path"] = o.Path
+func (o *Operation) UnmarshalJSON(buf []byte) error {
+	type op struct {
+		Op    string      `json:"op"`
+		Path  string      `json:"path"`
+		From  string      `json:"from"`
+		Value interface{} `json:"value"`
+	}
+	ref := op{}
+	if err := json.Unmarshal(buf, &ref); err != nil {
+		return err
+	}
+	o.Op, o.Path, o.From, o.Value = ref.Op, ref.Path, ref.From, ref.Value
+	path, err := newPointer(o.Path)
+	if err != nil {
+		return err
+	}
+	o.path = path
 	switch o.Op {
 	case "copy", "move":
-		res["from"] = o.From
-	case "add", "replace", "test":
-		res["value"] = o.Value
+		from, err := newPointer(o.From)
+		if err != nil {
+			return err
+		}
+		o.from = from
 	}
-	return json.Marshal(res)
+	return nil
 }
 
 const ContentType = "application/json-patch+json"
@@ -58,17 +74,17 @@ const ContentType = "application/json-patch+json"
 func (o *Operation) apply(to interface{}) (interface{}, error) {
 	switch o.Op {
 	case "test":
-		return to, o.Path.Test(to, o.Value)
+		return to, o.path.Test(to, o.Value)
 	case "replace":
-		return o.Path.Replace(to, o.Value)
+		return o.path.Replace(to, o.Value)
 	case "add":
-		return o.Path.Put(to, o.Value)
+		return o.path.Put(to, o.Value)
 	case "remove":
-		return o.Path.Remove(to)
+		return o.path.Remove(to)
 	case "move":
-		return o.From.Move(to, o.Path)
+		return o.from.Move(to, o.path)
 	case "copy":
-		return o.From.Copy(to, o.Path)
+		return o.from.Copy(to, o.path)
 	default:
 		return to, fmt.Errorf("Invalid op %v", o.Op)
 	}
@@ -85,23 +101,17 @@ func NewPatch(buf []byte) (res Patch, err error) {
 	}
 
 	for _, op := range res {
-		if op.Path == nil {
+		if op.path == nil {
 			return res, fmt.Errorf("Did not get valid path")
 		}
 		switch op.Op {
-		case "test":
-			fallthrough
-		case "replace":
-			fallthrough
-		case "add":
+		case "test", "replace", "add":
 			if op.Value == nil {
 				return res, fmt.Errorf("%v must have a valid value", op.Op)
 
 			}
-		case "move":
-			fallthrough
-		case "copy":
-			if op.From == nil {
+		case "move", "copy":
+			if op.from == nil {
 				return res, fmt.Errorf("%v must have a from", op.Op)
 			}
 		case "remove":
