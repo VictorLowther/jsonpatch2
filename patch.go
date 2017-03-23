@@ -31,10 +31,10 @@ type Operation struct {
 	Op string `json:"op"`
 	// Path is a JSON Pointer as defined in RFC 6901
 	// All Operations must have a Path
-	Path Pointer `json:"path"`
+	Path pointer `json:"path"`
 	// From is a JSON pointer indicating where a value should be
 	// copied/moved from.  From is only used by copy and move operations.
-	From Pointer `json:"from"`
+	From pointer `json:"from"`
 	// Value is the Value to be used for add, replace, and test operations.
 	Value interface{} `json:"value"`
 }
@@ -55,7 +55,7 @@ func (o *Operation) MarshalJSON() ([]byte, error) {
 const ContentType = "application/json-patch+json"
 
 // Apply performs a single patch operation
-func (o *Operation) Apply(to interface{}) (interface{}, error) {
+func (o *Operation) apply(to interface{}) (interface{}, error) {
 	switch o.Op {
 	case "test":
 		return to, o.Path.Test(to, o.Value)
@@ -116,7 +116,7 @@ func NewPatch(buf []byte) (res Patch, err error) {
 func (p Patch) apply(base interface{}) (result interface{}, err error, loc int) {
 	result = utils.Clone(base)
 	for i, op := range p {
-		result, err = op.Apply(result)
+		result, err = op.apply(result)
 		if err != nil {
 			return result, err, i
 		}

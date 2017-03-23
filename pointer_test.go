@@ -25,7 +25,7 @@ var ptrTests = []ptrTest{
 	{`foo/a~1b/c%d/~//~0`, []string{`foo`, `a/b`, `c%d`, ``, ``, `~`}, 6, false},
 }
 
-func ptrEqual(sample Pointer, target []string) bool {
+func ptrEqual(sample pointer, target []string) bool {
 	if len(sample) != len(target) {
 		return false
 	}
