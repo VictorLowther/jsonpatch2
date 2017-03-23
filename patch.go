@@ -113,14 +113,7 @@ func NewPatch(buf []byte) (res Patch, err error) {
 	return res, nil
 }
 
-// Apply applies rawPatch (which must be a []byte containing a valid
-// JSON Patch) to base, yielding result.  If err is returned, the
-// returned int is the index of the operation that failed.  If the
-// error is that rawPatch is not a valid JSON Patch, loc will be 0,
-//
-// base must be the result of unmarshaling JSON to interface{}, and
-// will not be modified.
-func (p Patch) Apply(base interface{}) (result interface{}, err error, loc int) {
+func (p Patch) apply(base interface{}) (result interface{}, err error, loc int) {
 	result = utils.Clone(base)
 	for i, op := range p {
 		result, err = op.Apply(result)
@@ -131,15 +124,20 @@ func (p Patch) Apply(base interface{}) (result interface{}, err error, loc int) 
 	return result, nil, 0
 }
 
+// Apply applies p to base (which must be a byte array containing
+// valid JSON), yielding result (which will also be a byte array
+// containing valid JSON).  If err is returned, the returned int is
+// the index of the operation that failed.
+
 // ApplyJSON does the same thing as Apply, except the inputs should be
 // JSON-containing byte arrays instead of unmarshalled JSON
-func (p Patch) ApplyJSON(base []byte) (result []byte, err error, loc int) {
+func (p Patch) Apply(base []byte) (result []byte, err error, loc int) {
 	var rawBase interface{}
 	err = json.Unmarshal(base, &rawBase)
 	if err != nil {
 		return nil, err, 0
 	}
-	rawRes, err, loc := p.Apply(rawBase)
+	rawRes, err, loc := p.apply(rawBase)
 	if err != nil {
 		return nil, err, loc
 	}

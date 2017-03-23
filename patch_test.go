@@ -408,7 +408,7 @@ var opTests = []opTest{
 func TestPatches(t *testing.T) {
 	for _, test := range opTests {
 		t.Log(test.desc)
-		var src, final interface{}
+		var src, res, final interface{}
 		if err := json.Unmarshal([]byte(test.src), &src); err != nil {
 			t.Errorf("`%v` is not a valid JSON source (%v)", test.src, err)
 			continue
@@ -421,10 +421,14 @@ func TestPatches(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v: Failed to make a Patch: %#v", test.desc, err)
 		}
-		res, err, idx := patch.Apply(src)
+		resBytes, err, idx := patch.Apply([]byte(test.src))
 		if test.pass {
 			if err != nil {
 				t.Errorf("Failed to apply patch `%v`. Failed at operation %v (%v)", test.patch, idx, err)
+				continue
+			}
+			if err := json.Unmarshal(resBytes, &res); err != nil {
+				t.Errorf("`%v` is not a valid JSON result: %v", string(resBytes), err)
 				continue
 			}
 			if !reflect.DeepEqual(res, final) {
@@ -458,9 +462,14 @@ func TestPatches(t *testing.T) {
 		if !reflect.DeepEqual(patch, testPatch) {
 			t.Errorf("Generated patch \n\t`%v` \nis not equal to reference patch \n\t`%v`", testPatch, test.patch)
 		}
-		newRes, err, idx := testPatch.Apply(src)
+		newResBytes, err, idx := testPatch.Apply([]byte(test.src))
 		if err != nil {
 			t.Errorf("Failed to apply generated patch `%v`. Failed at operation %v (%v)", testPatch, idx, err)
+			continue
+		}
+		var newRes interface{}
+		if err := json.Unmarshal(newResBytes, &newRes); err != nil {
+			t.Errorf("`%v` is not a valid JSON result: %v", string(newResBytes), err)
 			continue
 		}
 		if !reflect.DeepEqual(newRes, final) {
