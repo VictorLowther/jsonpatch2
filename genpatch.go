@@ -10,9 +10,14 @@ import (
 // This generator does not create copy or move patch ops, and I don't
 // care enough to optimize it to do so.  Ditto for slice handling.
 // There is a lot of optimization that could be done here, but it can get complex real quick.
-func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
+func basicGen(base, target interface{}, paranoid, pretest bool, ptr pointer) Patch {
 	res := make(Patch, 0)
 	pstr := ptr.String()
+	if pretest {
+		res = append(res, Operation{"test", pstr, "", utils.Clone(base), ptr, nil})
+		paranoid = false
+		pretest = false
+	}
 	if reflect.TypeOf(base) != reflect.TypeOf(target) {
 		if paranoid {
 			res = append(res, Operation{"test", pstr, "", utils.Clone(base), ptr, nil})
@@ -36,7 +41,7 @@ func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
 				}
 				res = append(res, Operation{"remove", newPstr, "", nil, newPtr, nil})
 			} else {
-				subPatch := basicGen(oldVal, newVal, paranoid, newPtr)
+				subPatch := basicGen(oldVal, newVal, paranoid, pretest, newPtr)
 				res = append(res, subPatch...)
 			}
 			handled[k] = struct{}{}
@@ -65,10 +70,22 @@ func basicGen(base, target interface{}, paranoid bool, ptr pointer) Patch {
 }
 
 // Generate generates a JSON Patch that will modify base into target.
-// If paranoid is true, then the generated patch will have test checks.
+// If paranoid is true, then the generated patch with have test checks for
+// changed item.
 //
 // base and target must be byte arrays containing valid JSON
 func Generate(base, target []byte, paranoid bool) (Patch, error) {
+	return GenerateFull(base, target, paranoid, false)
+}
+
+// Generate generates a JSON Patch that will modify base into target.
+// If paranoid is true, then the generated patch with have test checks for
+// changed item.
+// If pretest is true, then the generated patch with have test ALL
+// parts of the base.
+//
+// base and target must be byte arrays containing valid JSON
+func GenerateFull(base, target []byte, paranoid, pretest bool) (Patch, error) {
 	var rawBase, rawTarget interface{}
 	if err := json.Unmarshal(base, &rawBase); err != nil {
 		return nil, err
@@ -76,5 +93,5 @@ func Generate(base, target []byte, paranoid bool) (Patch, error) {
 	if err := json.Unmarshal(target, &rawTarget); err != nil {
 		return nil, err
 	}
-	return basicGen(rawBase, rawTarget, paranoid, make(pointer, 0)), nil
+	return basicGen(rawBase, rawTarget, paranoid, pretest, make(pointer, 0)), nil
 }
