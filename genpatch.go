@@ -10,7 +10,7 @@ import (
 // This generator does not create copy or move patch ops, and I don't
 // care enough to optimize it to do so.  Ditto for slice handling.
 // There is a lot of optimization that could be done here, but it can get complex real quick.
-func basicGen(base, target interface{}, paranoid, pretest bool, ptr pointer) Patch {
+func basicGen(base, target interface{}, paranoid, pretest bool, ptr Pointer) Patch {
 	res := make(Patch, 0)
 	pstr := ptr.String()
 	if pretest {
@@ -93,5 +93,5 @@ func GenerateFull(base, target []byte, paranoid, pretest bool) (Patch, error) {
 	if err := json.Unmarshal(target, &rawTarget); err != nil {
 		return nil, err
 	}
-	return basicGen(rawBase, rawTarget, paranoid, pretest, make(pointer, 0)), nil
+	return basicGen(rawBase, rawTarget, paranoid, pretest, make(Pointer, 0)), nil
 }

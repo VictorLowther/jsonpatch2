@@ -25,7 +25,7 @@ var ptrTests = []ptrTest{
 	{`foo/a~1b/c%d/~//~0`, []string{`foo`, `a/b`, `c%d`, ``, ``, `~`}, 6, false},
 }
 
-func ptrEqual(sample pointer, target []string) bool {
+func ptrEqual(sample Pointer, target []string) bool {
 	if len(sample) != len(target) {
 		return false
 	}
@@ -39,7 +39,7 @@ func ptrEqual(sample pointer, target []string) bool {
 
 func TestPointers(t *testing.T) {
 	for _, test := range ptrTests {
-		res, err := newPointer(test.sample)
+		res, err := NewPointer(test.sample)
 		if test.valid {
 			if err != nil {
 				t.Errorf("`%v` did not create pointer! (%v)", test.sample, err)

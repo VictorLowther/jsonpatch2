@@ -37,7 +37,7 @@ type Operation struct {
 	From string `json:"from"`
 	// Value is the Value to be used for add, replace, and test operations.
 	Value      interface{} `json:"value"`
-	path, from pointer
+	path, from Pointer
 }
 
 func (o *Operation) UnmarshalJSON(buf []byte) error {
@@ -52,14 +52,14 @@ func (o *Operation) UnmarshalJSON(buf []byte) error {
 		return err
 	}
 	o.Op, o.Path, o.From, o.Value = ref.Op, ref.Path, ref.From, ref.Value
-	path, err := newPointer(o.Path)
+	path, err := NewPointer(o.Path)
 	if err != nil {
 		return err
 	}
 	o.path = path
 	switch o.Op {
 	case "copy", "move":
-		from, err := newPointer(o.From)
+		from, err := NewPointer(o.From)
 		if err != nil {
 			return err
 		}

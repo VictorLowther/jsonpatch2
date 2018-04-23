@@ -35,13 +35,18 @@ func newSegment(s string) (pointerSegment, error) {
 	return pointerSegment(decode.Replace(s)), nil
 }
 
-// pointer is a JSON pointer
-type pointer []pointerSegment
+// Pointer is a JSON Pointer
+type Pointer []pointerSegment
+
+// Contains tests to see if B is a subset of A
+func (a Pointer) Contains(b Pointer) bool {
+	return len(b) >= len(a) && reflect.DeepEqual(a, b[:len(a)])
+}
 
 // newpointer takes a string that conforms to RFC6901 and turns it into a JSON pointer.
-func newPointer(s string) (pointer, error) {
+func NewPointer(s string) (Pointer, error) {
 	frags := strings.Split(s, `/`)[1:]
-	res := make(pointer, len(frags))
+	res := make(Pointer, len(frags))
 	// An empty pointer refers to the whole document, and so is valid.
 	if s == "" {
 		return res, nil
@@ -60,23 +65,23 @@ func newPointer(s string) (pointer, error) {
 }
 
 // Allow a pointer to be marshalled to valid JSON.
-func (p pointer) MarshalJSON() ([]byte, error) {
+func (p Pointer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.String())
 }
 
 // Allow unmarshalling from JSON
-func (p *pointer) UnmarshalJSON(buf []byte) error {
+func (p *Pointer) UnmarshalJSON(buf []byte) error {
 	var b string
 	if err := json.Unmarshal(buf, &b); err != nil {
 		return err
 	}
-	ptr, err := newPointer(b)
+	ptr, err := NewPointer(b)
 	*p = ptr[:]
 	return err
 }
 
 // String takes a pointer and returns its string value.
-func (p pointer) String() string {
+func (p Pointer) String() string {
 	frags := make([]string, len(p)+1)
 	for i, frag := range p {
 		frags[i+1] = frag.String()
@@ -85,23 +90,23 @@ func (p pointer) String() string {
 }
 
 // Shift extracts the first element in the pointer, returning it and the rest of the pointer.
-func (p pointer) Shift() (string, pointer) {
+func (p Pointer) Shift() (string, Pointer) {
 	if len(p) == 0 {
 		panic("Cannot shift empty jsonpatch.pointer")
 	}
-	return string(p[0]), pointer(p[1:])
+	return string(p[0]), Pointer(p[1:])
 }
 
 // Chop extracts the last element in the pointer, returning it and the rest of the pointer.
-func (p pointer) Chop() (string, pointer) {
+func (p Pointer) Chop() (string, Pointer) {
 	if len(p) == 0 {
 		panic("Cannot chop empty jsonpatch.pointer")
 	}
 	last := len(p) - 1
-	return string(p[last]), pointer(p[:last])
+	return string(p[last]), Pointer(p[:last])
 }
 
-func (p pointer) Append(frag string) pointer {
+func (p Pointer) Append(frag string) Pointer {
 	return append(p, pointerSegment(decode.Replace(frag)))
 }
 
@@ -121,7 +126,7 @@ func normalizeOffset(selector string, bound int) (int, error) {
 
 // Get takes an unmarshalled JSON blob, and returns the value pointed at by the pointer.
 // The unmarshalled blob is left unchanged.
-func (p pointer) Get(from interface{}) (interface{}, error) {
+func (p Pointer) Get(from interface{}) (interface{}, error) {
 	if len(p) == 0 {
 		return from, nil
 	}
@@ -144,7 +149,7 @@ func (p pointer) Get(from interface{}) (interface{}, error) {
 	}
 }
 
-func (p pointer) toContainer(to interface{}) (string, interface{}, error) {
+func (p Pointer) toContainer(to interface{}) (string, interface{}, error) {
 	if len(p) == 0 {
 		return "", nil, fmt.Errorf("Cannot happen")
 	}
@@ -154,7 +159,7 @@ func (p pointer) toContainer(to interface{}) (string, interface{}, error) {
 }
 
 // Replace replaces the pointed at value (which must exist) with val.
-func (p pointer) Replace(to interface{}, val interface{}) (interface{}, error) {
+func (p Pointer) Replace(to interface{}, val interface{}) (interface{}, error) {
 	if len(p) == 0 {
 		return val, nil
 	}
@@ -181,7 +186,7 @@ func (p pointer) Replace(to interface{}, val interface{}) (interface{}, error) {
 	return to, nil
 }
 
-func (p pointer) handleChangedSlice(to interface{}, s []interface{}) (interface{}, error) {
+func (p Pointer) handleChangedSlice(to interface{}, s []interface{}) (interface{}, error) {
 	if len(p) > 1 {
 		_, holdPtr := p.Chop()
 		return holdPtr.Replace(to, s)
@@ -196,7 +201,7 @@ func (p pointer) handleChangedSlice(to interface{}, s []interface{}) (interface{
 //
 // Put may have to return a new to if to happens to be a slice, since
 // the semantics of Put necessarily involve growing the Slice.
-func (p pointer) Put(to interface{}, val interface{}) (interface{}, error) {
+func (p Pointer) Put(to interface{}, val interface{}) (interface{}, error) {
 	selector, operatrix, err := p.toContainer(to)
 	if err != nil {
 		return to, err
@@ -232,7 +237,7 @@ func (p pointer) Put(to interface{}, val interface{}) (interface{}, error) {
 // Remove may have to return a new from if it is a slice, because the
 // semantics for Reomve on a Slice involve shrinking it, which
 // involves reallocation the way we do it.
-func (p *pointer) Remove(from interface{}) (interface{}, error) {
+func (p *Pointer) Remove(from interface{}) (interface{}, error) {
 	selector, operatrix, err := p.toContainer(from)
 	if err != nil {
 		return from, err
@@ -261,7 +266,7 @@ func (p *pointer) Remove(from interface{}) (interface{}, error) {
 }
 
 // Copy deep-copies the value pointed to by p in from to the location pointed to by at.
-func (p pointer) Copy(from interface{}, at pointer) (interface{}, error) {
+func (p Pointer) Copy(from interface{}, at Pointer) (interface{}, error) {
 	val, err := p.Get(from)
 	if err != nil {
 		return from, err
@@ -270,7 +275,7 @@ func (p pointer) Copy(from interface{}, at pointer) (interface{}, error) {
 }
 
 // Move moves the value pointed to by p in from to the location pointed to by at.
-func (p pointer) Move(from interface{}, at pointer) (interface{}, error) {
+func (p Pointer) Move(from interface{}, at Pointer) (interface{}, error) {
 	val, err := p.Get(from)
 	if err != nil {
 		return from, err
@@ -282,7 +287,7 @@ func (p pointer) Move(from interface{}, at pointer) (interface{}, error) {
 	return p.Remove(val)
 }
 
-func (p *pointer) Test(from interface{}, sample interface{}) error {
+func (p *Pointer) Test(from interface{}, sample interface{}) error {
 	val, err := p.Get(from)
 	if err == nil && !reflect.DeepEqual(val, sample) {
 		err = fmt.Errorf("Test op failed.")
