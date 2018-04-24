@@ -92,7 +92,7 @@ func (p Pointer) String() string {
 // Shift extracts the first element in the pointer, returning it and the rest of the pointer.
 func (p Pointer) Shift() (string, Pointer) {
 	if len(p) == 0 {
-		panic("Cannot shift empty jsonpatch.pointer")
+		return "", p
 	}
 	return string(p[0]), Pointer(p[1:])
 }
@@ -100,7 +100,7 @@ func (p Pointer) Shift() (string, Pointer) {
 // Chop extracts the last element in the pointer, returning it and the rest of the pointer.
 func (p Pointer) Chop() (string, Pointer) {
 	if len(p) == 0 {
-		panic("Cannot chop empty jsonpatch.pointer")
+		return "", p
 	}
 	last := len(p) - 1
 	return string(p[last]), Pointer(p[:last])
