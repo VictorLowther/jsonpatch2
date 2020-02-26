@@ -496,6 +496,21 @@ func TestPatches(t *testing.T) {
 	}
 }
 
+func TestUnmarshalledPatches(t *testing.T) {
+	p := Patch{
+		{Op: "test", Path: "/Pool", Value: "default"},
+		{Op: "replace", Path: "/Pool", Value: "fred"},
+	}
+	s := `{"Pool":"default"}`
+	b, e, _ := p.Apply([]byte(s))
+	if string(b) != `{"Pool":"fred"}` {
+		t.Errorf("Failed to apply unmarshaled Patch")
+	}
+	if e != nil {
+		t.Errorf("Failed to apply unmarshaled Patch with error: %v", e)
+	}
+}
+
 var fullOpTests = []opTest{
 	// Object adding and removing
 	{

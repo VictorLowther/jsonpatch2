@@ -40,18 +40,7 @@ type Operation struct {
 	path, from Pointer
 }
 
-func (o *Operation) UnmarshalJSON(buf []byte) error {
-	type op struct {
-		Op    string      `json:"op"`
-		Path  string      `json:"path"`
-		From  string      `json:"from"`
-		Value interface{} `json:"value"`
-	}
-	ref := op{}
-	if err := json.Unmarshal(buf, &ref); err != nil {
-		return err
-	}
-	o.Op, o.Path, o.From, o.Value = ref.Op, ref.Path, ref.From, ref.Value
+func (o *Operation) fixPointers() error {
 	path, err := NewPointer(o.Path)
 	if err != nil {
 		return err
@@ -66,6 +55,21 @@ func (o *Operation) UnmarshalJSON(buf []byte) error {
 		o.from = from
 	}
 	return nil
+}
+
+func (o *Operation) UnmarshalJSON(buf []byte) error {
+	type op struct {
+		Op    string      `json:"op"`
+		Path  string      `json:"path"`
+		From  string      `json:"from"`
+		Value interface{} `json:"value"`
+	}
+	ref := op{}
+	if err := json.Unmarshal(buf, &ref); err != nil {
+		return err
+	}
+	o.Op, o.Path, o.From, o.Value = ref.Op, ref.Path, ref.From, ref.Value
+	return o.fixPointers()
 }
 
 const ContentType = "application/json-patch+json"
@@ -134,6 +138,17 @@ func (p Patch) apply(base interface{}) (result interface{}, err error, loc int) 
 	return result, nil, 0
 }
 
+func (p Patch) fixPointers() error {
+	if len(p) > 0 && p[0].path == nil {
+		for i := range p {
+			if err := p[i].fixPointers(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Apply applies p to base (which must be a byte array containing
 // valid JSON), yielding result (which will also be a byte array
 // containing valid JSON).  If err is returned, the returned int is
@@ -145,6 +160,9 @@ func (p Patch) Apply(base []byte) (result []byte, err error, loc int) {
 	var rawBase interface{}
 	err = json.Unmarshal(base, &rawBase)
 	if err != nil {
+		return nil, err, 0
+	}
+	if err := p.fixPointers(); err != nil {
 		return nil, err, 0
 	}
 	rawRes, err, loc := p.apply(rawBase)
